@@ -1,0 +1,5 @@
+This is my first attempt at a HTML5 canvas game. I think it worked out pretty well. There are some bugs at the moment
+that i will try fix soon, one being that you can flag a square, and click it to reveal it so that both the number of 
+adjacent mines and the flag image appears.
+
+Hope you enjoy the game!
