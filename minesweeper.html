@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<hmtl lang="en">
+	<head>
+		<title>Minesweeper Canvas</title>
+		<meta charset="utf-8">
+		
+		<script type="text/javascript">
+		window.onload = init;
+		document.onkeypress = key_event;
+		
+		//Global variables
+		var firstClick = 1;//set to 0 when mouse is first clicked. this variable will control when the mines are generated so that a user cannot hit a mine on the first click
+		var canvas;
+		var context;
+		var WIDTH = 400;
+		var HEIGHT = 400;
+		var totalMines = 0;
+		var totalFlags = 0;
+		var difficulty = 7;//The higher the difficulty, the easier 
+		var mineMap = new Array(20);//This is a 2d array that holds the numbers that represent the mines and the number of adjacent mines
+		
+		var flagMap = new Array(20);//This is a 2d array that represents where flags have been placed on the map
+		//1 in the flagMap represents where a flag has been placed, 0 otherwise
+		var k;
+		for(k=0;k<20;k++){
+			flagMap[k] = Array(20);
+		}
+		
+		//This function sets the flagMap array to all 0s
+		function setToZero() {
+			var a,b;
+			for(a=0;a<20;a++){
+				for(b=0;b<20;b++){
+					flagMap[a][b] = 0;
+				}
+			}
+		}
+		
+		//This function sets up the canvas and adds the listener events
+		function init() {
+			canvas = document.getElementById("board");
+			context = canvas.getContext("2d");
+			context.background ="white";
+			//Attach the mousedowns event handler.
+			canvas.addEventListener('mousedown', mouseClick, false);
+			return setInterval(board,10);
+		}
+		//Function called when mouse button is pressed
+		function mouseClick (e) {
+			var mouseX = e.pageX - canvas.offsetLeft -1;//X coordinate of mouse
+			var mouseY = e.pageY - canvas.offsetTop -1;//Y coordinate of mouse
+			//Here is where we want to find out the mices
+			//coordinates to see exactly what square has been 
+			//selected
+			//Use of Math.floor would be useful here
+			//Finding array index in mineMap
+			var x = Math.floor(mouseX / 20);
+			var y = Math.floor(mouseY / 20);
+			if(e.which == 1){
+				//Left mouse clicked
+				//Display whether it is a mine
+				//or the number of mines beside the square
+				
+				//This is a piece of code to stop the first square chosen from ever being a mine. It will continually generate a new board until it finds a correct field where the chosen coordinate in not a mined square
+				if(firstClick == 1){
+					do {
+						generateMines(mineMap);
+					} while(mineMap[x][y] == -1);
+					document.getElementById('mines').innerHTML = "You have to find " + totalMines + " mines to win.";
+					firstClick = 0;
+					displayMineNum(x,y);
+				}
+				displayMineNum(x,y);
+				
+			} else if(e.which == 3){
+				//Right-mouse clicked
+				//We should flag the square 
+				var flag = new Image();
+				flag.onload = function() {
+					displayFlag(flag,x,y);
+				};
+				flag.src = 'flag.png';
+				return false;
+			}
+			
+		}
+		//Function to display the flag image
+		function displayFlag(flag,x,y){
+			//if this position has already been flagged, toggle off, otherwise place the flag
+			if(flagMap[x][y] != 1){
+				context.drawImage(flag, (x*20), (y*20), 20, 20);
+				flagMap[x][y] = 1;
+				totalFlags++;
+			} else {
+				//Toggle the flag image off
+				var img = context.createImageData(20, 20);
+				for (var i = img.data.length; --i >= 0;){
+				  img.data[i] = 0;
+				}
+				context.putImageData(img, x*20, y*20);//Replace flag image with empty pixels
+				flagMap[x][y] = 0;//Set the position in the flagMap back to 0 so it can be toggled again if it is flagged
+				totalFlags--;
+			}
+			document.getElementById('flags').innerHTML = "You have set " + totalFlags + " flags.";//Display number of flags set
+			if(calcWin()){
+				alert("You have won!!");
+			}
+		}
+		
+		function displayMineNum(x,y){
+			context.font = "16pt Arial";
+			//If the current square is not a mine, 
+			//reveal square
+			if(mineMap[x][y] != -1){
+				context.fillText(mineMap[x][y], (x*20)+3, (y*20)+18);
+			} else {
+				//display all mines and 
+				//end the game
+				var mine = new Image();
+				mine.onload = function() {
+					revealAllMines(mine);
+				};
+				mine.src = 'mine2.png';
+			}
+		}
+		
+		function calcWin(){
+			var count = 0;
+			for(var i=0;i<20;i++){
+				for(var j=0;j<20;j++){
+					//If the positions of where all the flags are matches where all the mines are, a win has occurred
+					if((flagMap[i][j] == 1 ) && (mineMap[i][j] == -1)){
+						count++;
+					} 
+				}
+			}
+			if(count == totalMines){
+				return true;
+			} else {
+				return false;
+			}
+		}//end function
+		
+		function placeMines(){
+			var i = 0;
+			var j = 0;
+			
+			for(i=0;i<20;i++){
+				for(j=0;j<20;j++){
+					//Any number that is not -1 gets set to 0
+					if(mineMap[i][j] > 0){
+						mineMap[i][j] = 0;
+					}
+				}
+			}
+		}//end placeMines()
+		
+		function revealAllMines(mine){
+			for(var i=0;i<20;i++){
+				for(var j=0;j<20;j++){
+					//displayMine
+					if(mineMap[i][j] == -1)
+						context.drawImage(mine, (i*20), (j*20), 20, 20);
+				}
+			}
+			gameOver();//End the game
+		}
+		
+		function gameOver(){
+			//alert("You hit a mine!\nYou have lost!");
+			document.getElementById('gameOver').innerHTML = "Oops! You hit a mine\nYour game will restart in 5 seconds...";
+			setTimeout("location.reload(true);",5000);
+		}
+		
+		function calcAdjacentMines() {
+			//This function involves the checking
+			//of all the different sections of the minemap
+			//for adjacents bombs. A counter is made to count the places
+			//and then replaces the index number it is checking
+			var mineCount = 0;//Variable for storing the number of adjacent mines
+			var i = 0;
+			var j = 0;
+			totalMines = 0;//Global variable that counts the total amount of mines that the player has to find
+			for(i=0;i<20;i++){
+				for(j=0;j<20;j++){
+					//If the square is not a mine.. calculate its surround mine number
+					if(mineMap[i][j] != -1){
+						//N
+						if(j > 0 && mineMap[i][j-1] == -1){
+							mineCount++;
+						}
+						//NW
+						if(i > 0 && j > 0 && mineMap[i-1][j-1] == -1){
+							mineCount++;
+						}
+						//NE
+						if(j > 0 && i < 19 && mineMap[i+1][j-1] == -1){
+							mineCount++;
+						}
+						//E
+						if(i < 19 && mineMap[i+1][j] == -1){
+							mineCount++;
+						}
+						//W
+						if(i > 0 && mineMap[i-1][j] == -1){
+							mineCount++;
+						}
+						//S
+						if(j < 19 && mineMap[i][j+1] == -1){
+							mineCount++;
+						}
+						//SW
+						if(i > 0 && j < 19 && mineMap[i-1][j+1] == -1 ){
+							mineCount++;
+						}
+						//SE
+						if(i < 19 && j < 19 && mineMap[i+1][j+1]){
+							mineCount++;
+						} 
+						mineMap[i][j] = mineCount;
+						mineCount = 0;
+					} else {
+						totalMines++;		
+					}
+				} 
+			}
+		}//end function
+		
+		
+		function generateMines(){
+			var i;
+			var j;
+			var random_num;
+			
+			for(i=0;i<20;i++){
+				mineMap[i] = new Array(20);
+			}
+			
+			for(i=0;i<20;i++){
+				for(j=0;j<20;j++){
+					random_num = Math.floor((Math.random()*difficulty)-1);//Generating random number of mines
+					mineMap[i][j] = random_num;	
+				}
+			} placeMines();
+			calcAdjacentMines();
+		}//end function
+		
+		function board() {
+			var i = 0;
+			var j = 0;
+			for(i=0;i<=400;i=i+20){
+				for(j=0;j<=400;j=j+20){
+					rect(i,j,20,20);//Place rectangles
+				} 
+			}
+		}
+		
+		function key_event(evt) {
+			alert("You pressed key 0x" + evt.keyCode);
+		     //here is one example for de-activating the 'esc'
+		     if(evt.keyCode == 27) return false; //keyCode returns the ASCII value of the key pressed.
+		}
+
+		function rect(x,y,width,height){
+			context.beginPath();
+			context.rect(x,y,width,height);
+			context.strokeStyle = "black";
+			context.stroke();
+		}
+		
+		</script>
+
+		<style type="text/css">
+		body {
+			font-family : Helvetica, Arial, sans-serif;
+			background-color : rgb(0,102,0);
+			color : black;
+			margin : 0;
+			padding : 0;
+			text-align : center;
+		}
+
+		header h1 {
+			color : yellow;
+			text-shadow : 3px 3px 3px black;
+		}
+
+		p {
+			color : white;
+			font-size : 80%;
+		}
+		
+		canvas {
+			opacity : .6;
+			border : solid 1px black;
+			background-color : #bbbbbb;
+		}
+		</style>
+	</head>
+	<body oncontextmenu="return false;">
+		<header>
+			<h1>Minesweeper</h1>
+		</header>
+		<div>
+			<section>
+				<p id="gameOver">
+			
+				</p>
+				<p id="mines">
+			
+				</p>
+				<p id="flags">
+			
+				</p>
+			</section>
+		<div>
+		<canvas id="board" width="400" height="400">
+			<p>Sorry. You're browser does not support the canvas element</p>
+		</canvas>
+
+		<noscript>
+			<p>Sorry. You're javascript is disabled. You will need to enable it in order to play the game.
+			</p>
+		</noscript>
+	</body>
+	</html>
